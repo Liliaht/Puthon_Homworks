@@ -3,6 +3,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+
 def test_form_validation():
     # Инициализация драйвера Edge
     driver = webdriver.Edge()
@@ -29,11 +30,10 @@ def test_form_validation():
         WebDriverWait(driver, 10).until(
             EC.presence_of_element_located((By.CSS_SELECTOR, ".alert-danger"))
         )
-        
         # Проверяем, что поле Zip code подсвечено красным
-        zip_code_field = driver.find_element(By.CSS_SELECTOR, 'input[name="zip-code"]')
+        zip_code_field = driver.find_element(By.ID, 'zip-code')
         zip_code_class = zip_code_field.get_attribute("class")
-        assert "is-invalid" in zip_code_class, "Поле Zip code не подсвечено красным"
+        assert "alert py-2 alert-danger" in zip_code_class, "Поле Zip code не подсвечено красным"
         
         # Проверяем, что остальные поля подсвечены зеленым
         fields_to_check = [
@@ -42,9 +42,9 @@ def test_form_validation():
         ]
         
         for field_name in fields_to_check:
-            field = driver.find_element(By.CSS_SELECTOR, f'input[name="{field_name}"]')
+            field = driver.find_element(By.ID, f"{field_name}")
             field_class = field.get_attribute("class")
-            assert "is-valid" in field_class, f"Поле {field_name} не подсвечено зеленым"
+            assert "alert py-2 alert-success" in field_class, f"Поле {field_name} не подсвечено зеленым"
             
     finally:
         # Закрываем браузер
