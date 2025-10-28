@@ -1,50 +1,83 @@
 import pytest
-import requests
-from config import BASE_URL, API_TOKEN
+import os
+from api_client import APIClient
+from pages.projects_api import ProjectsAPI
+
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--base-url",
+        action="store",
+        default="https://yougile.com",
+        help="Base URL for Yougile API"
+    )
+    parser.addoption(
+        "--api-token",
+        action="store",
+        help="Yougile API token for authorization"
+    )
 
 
 @pytest.fixture
-def auth_headers():
-    """Фикстура для заголовков авторизации"""
-    return {
-        "Authorization": f"Bearer {API_TOKEN}",
-        "Content-Type": "application/json"
-    }
-
-
-@pytest.fixture
-def api_client(auth_headers):
-    """Фикстура для API клиента"""
-    class APIClient:
-        def __init__(self):
-            self.base_url = BASE_URL
-            self.headers = auth_headers
-        
-        def post(self, endpoint, data):
-            return requests.post(f"{self.base_url}{endpoint}", json=data, headers=self.headers)
-        
-        def put(self, endpoint, data):
-            return requests.put(f"{self.base_url}{endpoint}", json=data, headers=self.headers)
-        
-        def get(self, endpoint):
-            return requests.get(f"{self.base_url}{endpoint}", headers=self.headers)
+def api_client(request):
+    """Фикстура для создания экземпляра API клиента"""
+    base_url = request.config.getoption("--base-url")
+    api_token = request.config.getoption("--api-token")
     
-    return APIClient()
+    # Получаем токен из параметров или переменных окружения
+    if not api_token:
+        api_token = os.getenv("YOUGILE_API_TOKEN")
+    
+    if not api_token:
+        pytest.skip("API token not provided. Use --api-token or set YOUGILE_API_TOKEN environment variable")
+    
+    # Создаем экземпляр APIClient
+    client = APIClient(base_url=base_url, token=api_token)
+    
+    yield client
+    
+    # Закрываем соединение после теста
+    client.close()
 
 
 @pytest.fixture
-def created_project_id(api_client):
-    """Фикстура для создания проекта и получения его ID"""
-    project_data = {
-        "title": "Test Project for Fixture",
-        "description": "Project created for testing purposes"
-    }
+def unauthorized_api_client(request):
+    """Фикстура для создания неавторизованного API клиента"""
+    base_url = request.config.getoption("--base-url")
     
-    response = api_client.post("/api-v2/projects", project_data)
-    assert response.status_code == 201
-    project_id = response.json()["id"]
+    # Создаем клиент без токена или с невалидным токеном
+    client = APIClient(base_url=base_url, token="invalid_token")
+    
+    yield client
+    
+    client.close()
+
+
+@pytest.fixture
+def projects_api(api_client):
+    """Фикстура для работы с API проектов"""
+    return ProjectsAPI(api_client)
+
+
+@pytest.fixture
+def created_project(projects_api):
+    """Фикстура создает тестовый проект и возвращает его ID"""
+    import time
+    
+    response = projects_api.create_project(
+        title=f"Test Project {int(time.time())}",
+        description="This project was created for automated testing"
+    )
+    
+    assert response.status_code == 201, "Failed to create test project"
+    project_data = response.json()
+    project_id = project_data.get("id")
     
     yield project_id
     
-    # Очистка - удаление проекта после теста
-    api_client.delete(f"/api-v2/projects/{project_id}")
+    # Очистка: пытаемся удалить созданный проект после теста
+    try:
+        projects_api.delete_project(project_id)
+    except Exception:
+        # Игнорируем ошибки при удалении
+        pass
