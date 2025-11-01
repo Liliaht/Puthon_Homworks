@@ -5,7 +5,7 @@ from models import Base, Student
 from datetime import datetime
 
 # Настройки подключения к БД - ЗАМЕНИТЕ НА СВОИ!
-DB_URL = "postgresql://postgres:password@localhost:5432/test_database"
+DB_URL = "postgresql://postgres:4090783@localhost:5432/postgres"
 
 class TestCRUDOperations:
     
